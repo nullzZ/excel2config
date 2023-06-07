@@ -1,17 +1,34 @@
 # excel gen
 
+## 运行
+./darwin_gen_excel -s="../data" -t="../gen" -skipRow=5 -skipCol=1
+
 ### excel文件规则
-  * 忽略不是xlsx扩展名的，包含#号的 
+
+* 忽略不是xlsx扩展名的、开头#号的 ，如 忽略a.exl、#a.xlsx
 
 ### sheet规则
-  * sheet名字不可以是默认Sheet和中文,#开头会被忽略
-  * _c前端使用
-  * _s和不带_c为后端使用
-  * 如果服务器端不配置字段属性或者没有字段名就会忽略
+
+#### 忽略规则
+
+* 默认名Sheet
+* 中文
+* #开头
+* _c前端使用
+* _s或者不带_c、_s为后端使用，_c前端使用
+
+#### 跳过规则
+* 跳过行数 skipRow
+* 跳过列数 skipCol
 
 ### 字段规则
 
-注意！！！！！！！第一行和第一列 留出给从策划备注用
+#### 忽略规则
+
+* 没有配置字段属性
+* 没有字段名
+
+
 
 * 第1行策划描述
 * 第2行字段名 如 id
@@ -19,32 +36,20 @@
 * 第4行字段类型(前端) 如 int
 * 第5行备注描述
 * map类型 map<int,int>//1:2,3:4
-  * 类型：map<int,long>,map<int,string>等
+    * 类型：map<int,long>,map<int,string>等
 * 一维数组 1,2,3,4或者[1,2,3,4]
     * 类型：int[],long[],string[],float[],double[]等
 * 二维数组 [[1,2],[3,4]],单数据可以[[1,2]]或[1,2]
     * 类型：int[][],long[][],string[][],float[][],double[][]等
 * 基本类型 int(备注等于int32) int32 long float double string
 
-字段规则可以自己扩展-------------------
-
-```go
-    //config.go
-LineNumber     = 5 //每个sheet开始行数
-SkipColNumber = 1  //跳过列数
-
-FieldName = 1
-ClientFieldTyp = 2
-ServerFieldTyp = 3
-FieldAnn = 4 //注释
-```
-
 ### 类型
 
 * 主键必须是 int int32 int64 string
-* 支持的类型
+* 字段支持的类型
 
 ```go
+
 stringTyp = "string"
 
 intTyp = "int"
@@ -88,7 +93,7 @@ mapInt32Float64 = "map<int32,double>"
 
 例如 map<int,int>@Resource?1,2
 
-### 使用
+### golang 使用
 
 * 生成配置文件 bin中可执行文件 -s excel源地址 -t gen目标地址
 * 加载

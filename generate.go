@@ -2,6 +2,9 @@ package excel2conf
 
 import (
 	"errors"
+	"fmt"
+	"github.com/nullzZ/excel2config/field"
+	"github.com/nullzZ/excel2config/model"
 	"github.com/nullzZ/excel2config/pkg/zaplog"
 	"github.com/tealeg/xlsx"
 	"io/ioutil"
@@ -22,29 +25,32 @@ type GenerateExcel struct {
 	sourcePath    string //源路径
 	genList       []IGen
 	genGlobalList []IGlobalGen
-	cfgDatas      map[string]*ConfigData
+	cfgDatas      map[string]*model.ConfigData
+	genCfg        *GenCfg
 }
 
-func NewGenerateExcel(sourcePath, toPath string) *GenerateExcel {
+func NewGenerateExcel(sourcePath, toPath string, opt ...GenOption) *GenerateExcel {
 	gen := &GenerateExcel{
 		toPath:        toPath,
 		sourcePath:    sourcePath,
 		genList:       make([]IGen, 0, 10),
 		genGlobalList: make([]IGlobalGen, 0, 10),
-		cfgDatas:      make(map[string]*ConfigData, 1),
+		cfgDatas:      make(map[string]*model.ConfigData, 1),
 	}
-	gen.AddGen(&GenConfigStruct{})
-	gen.AddGen(&GenRawdataConf{})
-	gen.AddGen(&GenChecker{})
-
-	gen.AddGlobalGen(&GenGlobalLoad{})
-	gen.AddGlobalGen(&GenGlobalInit{})
+	gen.genCfg = &GenCfg{}
+	for _, option := range opt {
+		option(gen.genCfg)
+	}
+	gen.AddGen(&GenJson{})
 	return gen
 }
 
+// AddGen 增加单sheet生成器
 func (g *GenerateExcel) AddGen(gen IGen) {
 	g.genList = append(g.genList, gen)
 }
+
+// AddGlobalGen 增加全局生成器
 func (g *GenerateExcel) AddGlobalGen(gen IGlobalGen) {
 	g.genGlobalList = append(g.genGlobalList, gen)
 }
@@ -74,12 +80,12 @@ func (g *GenerateExcel) ReadFile() error {
 		}
 		zaplog.SugaredLogger.Debugf("gen---file=%s", file.Name())
 		for _, sheet := range f.Sheets {
-			if g.isContinue(sheet) { //跳过sheet
+			if g.isSheetContinue(sheet) { //跳过sheet
 				continue
 			}
 
-			if sheet.MaxRow < LineNumber+1 {
-				zaplog.SugaredLogger.Errorf("ReadFile sheet.MaxRow < %d sheet=%s", LineNumber+1, sheet.Name)
+			if sheet.MaxRow < g.genCfg.SkipRowNumber+1 {
+				zaplog.SugaredLogger.Errorf("ReadFile sheet.MaxRow < %d sheet=%s", g.genCfg.SkipRowNumber+1, sheet.Name)
 				return ErrorMaxRow
 			}
 
@@ -111,10 +117,10 @@ func (g *GenerateExcel) ReadFile() error {
 func (g *GenerateExcel) GenSheet(sheet *xlsx.Sheet, sheetName, pack string) error {
 	colNum := sheet.MaxCol
 	contunies := make(map[int]bool)
-	metaList := make([]*Meta, 0, colNum)
-	dataList := make([]RowData, 0, len(sheet.Rows)-LineNumber)
+	metaList := make([]*model.Meta, 0, colNum)
+	dataList := make([]model.RowData, 0, len(sheet.Rows)-g.genCfg.SkipRowNumber)
 	for i := 0; i < colNum; i++ {
-		if i < SkipColNumber {
+		if i < g.genCfg.SkipColNumber {
 			continue
 		}
 		fieldName := sheet.Cell(FieldName, i)           //字段名字
@@ -130,7 +136,7 @@ func (g *GenerateExcel) GenSheet(sheet *xlsx.Sheet, sheetName, pack string) erro
 			continue
 		}
 		typs := strings.Split(fieldTyp.Value, "@") //用@符号分割
-		m := &Meta{
+		m := &model.Meta{
 			Key:       fieldName.Value,
 			Idx:       i,
 			Typ:       typs[0], //fieldTyp.Value
@@ -141,7 +147,7 @@ func (g *GenerateExcel) GenSheet(sheet *xlsx.Sheet, sheetName, pack string) erro
 		if len(typs) > 1 {
 			m.CheckerName = typs[1]
 		}
-		if !checkFieldType(m.Typ) {
+		if !field.CheckFieldType(m.Typ) {
 			zaplog.SugaredLogger.Errorf("ReadFile sheet=%s m= %v", sheetName, m)
 			return errors.New("type err")
 		}
@@ -149,12 +155,12 @@ func (g *GenerateExcel) GenSheet(sheet *xlsx.Sheet, sheetName, pack string) erro
 	}
 
 	for i, _ := range sheet.Rows {
-		if i < LineNumber {
+		if i < g.genCfg.SkipRowNumber {
 			continue
 		}
-		data := make(RowData, 0, colNum)
+		data := make(model.RowData, 0, colNum)
 		for j := 0; j < colNum; j++ {
-			if j < SkipColNumber {
+			if j < g.genCfg.SkipColNumber {
 				continue
 			}
 			c := sheet.Cell(i, j)
@@ -166,7 +172,7 @@ func (g *GenerateExcel) GenSheet(sheet *xlsx.Sheet, sheetName, pack string) erro
 		dataList = append(dataList, data)
 	}
 
-	configData := NewConfigData(g.toPath, pack, sheetName, metaList, dataList)
+	configData := model.NewConfigData(g.toPath, pack, sheetName, metaList, dataList)
 	g.cfgDatas[sheetName] = configData //存一下 后面使用
 	for _, gen := range g.genList {
 		err := gen.Gen(configData)
@@ -180,13 +186,15 @@ func (g *GenerateExcel) GenSheet(sheet *xlsx.Sheet, sheetName, pack string) erro
 	return nil
 }
 
-func (GenerateExcel) isContinue(sheet *xlsx.Sheet) bool {
+// isSheetContinue 是否跳过sheet
+func (g *GenerateExcel) isSheetContinue(sheet *xlsx.Sheet) bool {
 	if strings.HasPrefix(sheet.Name, "#") {
 		return true
 	}
 	if strings.Index(sheet.Name, "Sheet") != -1 { //排除默认sheet
 		return true
 	}
+
 	if strings.Contains(sheet.Name, "_c") { //_c 前端使用
 		return true
 	}
@@ -199,7 +207,8 @@ func (GenerateExcel) isContinue(sheet *xlsx.Sheet) bool {
 	return false
 }
 
-func (GenerateExcel) isFileContinue(fileName string) bool { //是否跳过excel表格
+// isFileContinue 是否跳过excel文件
+func (g *GenerateExcel) isFileContinue(fileName string) bool { //是否跳过excel表格
 	if path.Ext(fileName) != ".xlsx" {
 		return true
 	}
@@ -217,4 +226,16 @@ func (g *GenerateExcel) isMetaContinue(val string) bool {
 	//	return true
 	//}
 	return false
+}
+
+// CheckPriRepeat 检测主键是否重复
+func CheckPriRepeat(data []*model.GenJsonData2) error {
+	m := make(map[string]bool)
+	for _, d := range data {
+		if _, ok := m[d.PriKey]; ok {
+			return fmt.Errorf("Duplicate primary key id=%s", d.PriKey)
+		}
+		m[d.PriKey] = true
+	}
+	return nil
 }

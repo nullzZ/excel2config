@@ -1,6 +1,8 @@
 package excel2conf
 
 import (
+	"github.com/nullzZ/excel2config/field"
+	"github.com/nullzZ/excel2config/model"
 	"github.com/nullzZ/excel2config/pkg/file"
 	"github.com/nullzZ/excel2config/pkg/str"
 	"os"
@@ -10,26 +12,26 @@ import (
 
 type GenJson struct{}
 
-func (g *GenJson) Gen(structModel *ConfigData) error {
+func (g *GenJson) Gen(structModel *model.ConfigData) error {
 	sheetName := structModel.SheetName
-	genJsonData := &GenJsonData{
+	genJsonData := &model.GenJsonData{
 		Name: sheetName,
 	}
 	for _, row := range structModel.DataRow {
-		genJsonData2 := &GenJsonData2{}
+		genJsonData2 := &model.GenJsonData2{}
 		for idx, meta := range structModel.MetaList {
 			if idx == 0 {
-				priKey, err := ParseMetaField(row[idx], meta.Typ, true)
+				priKey, err := field.ParseMetaField(row[idx], meta.Typ, true)
 				if err != nil {
 					return err
 				}
 				genJsonData2.PriKey = priKey
 			}
-			field, err := ParseMetaField(row[idx], meta.Typ, false)
+			field, err := field.ParseMetaField(row[idx], meta.Typ, false)
 			if err != nil {
 				return err
 			}
-			genJsonData2.Fields = append(genJsonData2.Fields, &GenJsonField{
+			genJsonData2.Fields = append(genJsonData2.Fields, &model.GenJsonField{
 				FieldName: meta.Key,
 				FieldVal:  field,
 			})

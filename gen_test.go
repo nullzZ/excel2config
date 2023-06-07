@@ -2,17 +2,26 @@ package excel2conf
 
 import (
 	"encoding/json"
+	"github.com/nullzZ/excel2config/field"
+	"github.com/nullzZ/excel2config/gen_go"
 	"github.com/nullzZ/excel2config/pkg/zaplog"
 	"go.uber.org/zap"
 	"log"
 	"testing"
 )
 
-func TestGen(t *testing.T) {
+func TestGenGo(t *testing.T) {
 	sourcePath := "/Users/malei/works/excel2config/data"
 	toPath := "/Users/malei/works/excel2config/gen"
 	zaplog.Init(zap.DebugLevel)
-	gen := NewGenerateExcel(sourcePath, toPath)
+	gen := NewGenerateExcel(sourcePath, toPath, WithSkipRow(5), WithSkipCol(1))
+	gen.AddGen(&gen_go.GenConfigStruct{})
+	gen.AddGen(&gen_go.GenRawdataConf{})
+	gen.AddGen(&gen_go.GenChecker{})
+
+	gen.AddGlobalGen(&gen_go.GenGlobalLoad{})
+	gen.AddGlobalGen(&gen_go.GenGlobalInit{})
+
 	err := gen.ReadFile()
 	if err != nil {
 		t.Errorf("err=%q", err)
@@ -20,7 +29,7 @@ func TestGen(t *testing.T) {
 }
 
 func TestIsRepeated(t *testing.T) {
-	ok := IsRepeated("<1,2,3>")
+	ok := field.IsRepeated("<1,2,3>")
 	t.Logf("@@@%v", ok)
 }
 
@@ -42,10 +51,10 @@ func TestRepeated2(t *testing.T) {
 }
 
 func TestParseRepeated2Json(t *testing.T) {
-	str := parseRepeated2Json(repeatedInt2Typ, "[1,2]")
+	str := field.ParseRepeated2Json(field.RepeatedInt2Typ, "[1,2]")
 	t.Log(str)
-	str2 := parseRepeated2Json(repeatedInt2Typ, "[[1,2]]")
+	str2 := field.ParseRepeated2Json(field.RepeatedInt2Typ, "[[1,2]]")
 	t.Log(str2)
-	str3 := parseRepeated2Json(repeatedInt2Typ, "[[1,2],[1]]")
+	str3 := field.ParseRepeated2Json(field.RepeatedInt2Typ, "[[1,2],[1]]")
 	t.Log(str3)
 }
