@@ -20,6 +20,8 @@ func main() {
 	gen.AddGen(&gen_go.GenRawdataConf{})
 	gen.AddGlobalGen(&gen_go.GenGlobalLoad{})
 	gen.AddGlobalGen(&gen_go.GenGlobalInit{})
+	gen.AddGlobalGen(&gen_go.GenGlobalLoader{})
+	gen.AddGlobalGen(&gen_go.GenGlobalErr{})
 	err := gen.ReadFile()
 	if err != nil {
 		zaplog.SugaredLogger.Panic(err)

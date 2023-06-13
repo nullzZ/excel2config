@@ -1,0 +1,186 @@
+package conf_loader
+
+import (
+	"crypto/md5"
+	"github.com/fsnotify/fsnotify"
+	"go.uber.org/zap"
+	"io/ioutil"
+	"log"
+	"strings"
+	"sync"
+)
+
+type LocalLoader struct {
+	sync.Mutex
+	fileMap map[string]string
+}
+
+func NewLocalLoader() *LocalLoader {
+	return &LocalLoader{
+		fileMap: make(map[string]string, 0),
+	}
+}
+
+func (p *LocalLoader) isChange(name string) bool {
+	p.Lock()
+	defer p.Unlock()
+	data, err := ioutil.ReadFile(name)
+	if err != nil {
+		logger.Errorf("local watch read file error", err.Error())
+		return true
+	}
+	hash := md5.New()
+	hash.Write(data)
+	md5 := string(hash.Sum(nil))
+	if v, ok := p.fileMap[name]; ok && v == md5 {
+		return false
+	}
+	p.fileMap[name] = md5
+	return true
+}
+
+func (p *LocalLoader) Read(path string) ([]byte, error) {
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	hash := md5.New()
+	hash.Write(b)
+	md5 := string(hash.Sum(nil))
+	p.Lock()
+	p.fileMap[path] = md5
+	p.Unlock()
+	return b, nil
+}
+
+func (p *LocalLoader) Watch(path string, onChange func(string)) {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		logger.Error(err.Error())
+	}
+	defer watcher.Close()
+
+	done := make(chan struct{})
+
+	go func(watcher *fsnotify.Watcher) {
+		for {
+			select {
+			case event := <-watcher.Events:
+				if (event.Op&fsnotify.Write) == fsnotify.Write ||
+					(event.Op&fsnotify.Create) == fsnotify.Create {
+					if p.isChange(event.Name) {
+						onChange(event.Name)
+					}
+				}
+			case err = <-watcher.Errors:
+				logger.Error(err.Error())
+			}
+		}
+	}(watcher)
+
+	if err = watcher.Add(path); err != nil {
+		logger.Error(err.Error())
+	}
+
+	<-done
+}
+
+
+
+type ConfigLoaderIF interface {
+	Read(string) ([]byte, error)
+	Watch(string, func(string))
+}
+
+var (
+	pathConf    string
+	confLoader  ConfigLoaderIF
+	funcLoaders = make(map[string]func(b []byte) error, 0)
+	logger      *zap.SugaredLogger
+	checker     func() bool
+)
+
+func AddLoader(key string, f func(b []byte) error) {
+	funcLoaders[key] = f
+}
+
+func AddChecker(ff func() bool) {
+	checker = ff
+}
+
+func MustInitLocal(path string, liveLoading bool, zapLogger *zap.SugaredLogger) {
+	logger = zapLogger
+	InitWithLoader(path, NewLocalLoader(), true, liveLoading)
+	if checker != nil {
+		ok := checker()
+		if !ok {
+			logger.Fatalf("checker err!!!")
+		}
+	}
+}
+
+func InitWithLoader(path string, loader ConfigLoaderIF, must bool, liveLoading bool) error {
+	log.Printf("conf init With Path:%s", path)
+	confLoader = loader
+	pathConf = path
+	if !strings.HasSuffix(pathConf, "/") {
+		pathConf = pathConf + "/"
+	}
+	for key, loader := range funcLoaders {
+		if !strings.HasPrefix(key, pathConf) {
+			funcLoaders[pathConf+key] = loader
+			delete(funcLoaders, key)
+		}
+	}
+	ea := LoadAll()
+	if ea.Err() != nil {
+		if must {
+			panic(ea.Error())
+		}
+		return ea
+	}
+	if liveLoading {
+		go confLoader.Watch(pathConf, loadWithPath)
+	}
+	return nil
+}
+
+func loadWithPath(path string) {
+	//if _, ok := confLoader.(*EtcdLoader); ok {
+	//	path = strings.TrimPrefix(path, "/")
+	//}
+	if loader, ok := funcLoaders[path]; !ok {
+		logger.Debugf("conf loader not found:%s", path)
+	} else {
+		b, err := confLoader.Read(path)
+		if err != nil {
+			logger.Warnf("conf load %s with error %s", path, err.Error())
+			return
+		}
+		if err := loader(b); err == nil {
+			logger.Infof("conf load %s with succ", path)
+		} else {
+			logger.Warnf("conf load %s with error %s", path, err.Error())
+		}
+	}
+
+}
+
+func LoadAll() Array {
+	var errs Array
+	for path, loader := range funcLoaders {
+		b, err := confLoader.Read(path)
+		if err != nil {
+			logger.Errorf("conf load %s with error %s", path, err.Error())
+			errs.Push(err)
+			continue
+		}
+		if err := loader(b); err == nil {
+			logger.Infof("conf load %s with succ", path)
+		} else {
+			logger.Errorf("conf load %s with error %s", path, err.Error())
+			errs.Push(err)
+		}
+	}
+	return errs
+}

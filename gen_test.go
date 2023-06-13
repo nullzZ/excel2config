@@ -3,7 +3,10 @@ package excel2conf
 import (
 	"encoding/json"
 	"github.com/nullzZ/excel2config/field"
+	"github.com/nullzZ/excel2config/gen/conf_loader"
+	"github.com/nullzZ/excel2config/gen/config"
 	"github.com/nullzZ/excel2config/gen_go"
+	"github.com/nullzZ/excel2config/pkg/checker"
 	"github.com/nullzZ/excel2config/pkg/zaplog"
 	"go.uber.org/zap"
 	"log"
@@ -21,6 +24,8 @@ func TestGenGo(t *testing.T) {
 
 	gen.AddGlobalGen(&gen_go.GenGlobalLoad{})
 	gen.AddGlobalGen(&gen_go.GenGlobalInit{})
+	gen.AddGlobalGen(&gen_go.GenGlobalLoader{})
+	gen.AddGlobalGen(&gen_go.GenGlobalErr{})
 
 	err := gen.ReadFile()
 	if err != nil {
@@ -57,4 +62,15 @@ func TestParseRepeated2Json(t *testing.T) {
 	t.Log(str2)
 	str3 := field.ParseRepeated2Json(field.RepeatedInt2Typ, "[[1,2],[1]]")
 	t.Log(str3)
+}
+
+func TestLoader(t *testing.T) {
+	zaplog.Init(zap.DebugLevel)
+	config.InitWithLoader(conf_loader.AddLoader)
+	conf_loader.MustInitLocal("/Users/malei/works/excel2config/gen/rawdata", true, zaplog.SugaredLogger)
+
+	m := make(map[string]func(i interface{}, param string) bool)
+	m["ArrayExist"] = checker.ArrayExist
+	config.InitCheckerFunc(m)              //注册自定义注解函数
+	conf_loader.AddChecker(config.Checker) //加载检测方法
 }

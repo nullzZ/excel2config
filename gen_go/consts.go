@@ -6,4 +6,6 @@ const (
 	GenRawdataConfFileName = "_conf.gen.go"
 	GenInitConfigFileName  = "gen_init.go"
 	GenCheckerConf         = "_checker_conf.gen.go"
+	GenLoaderName          = "loader.go"
+	GenErrName             = "err_array.go"
 )

@@ -50,6 +50,10 @@ type GenInit struct {
 	Package string
 }
 
+type GenLoader struct {
+	Package string
+}
+
 func NewGoField(name, kind, annotation, jsonStr string) *GoField {
 	return &GoField{
 		Name:       name,
@@ -91,5 +95,11 @@ func NewChecker(pack, name, priName string) *Checker {
 		Package: pack,
 		Name:    name,
 		PriName: priName,
+	}
+}
+
+func NewGenLoader(pack string) *GenLoader {
+	return &GenLoader{
+		Package: pack,
 	}
 }
