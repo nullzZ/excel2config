@@ -1,6 +1,7 @@
 package gen_go
 
 import (
+	_ "embed"
 	"github.com/nullzZ/excel2config/model"
 	"github.com/nullzZ/excel2config/pkg/file"
 	"github.com/nullzZ/excel2config/pkg/str"
@@ -9,6 +10,9 @@ import (
 	"strings"
 	"text/template"
 )
+
+//go:embed go_struct.tmpl
+var goTmpl string
 
 type GenConfigStruct struct{}
 

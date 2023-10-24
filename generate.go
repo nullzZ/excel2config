@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"path"
 	"strings"
+	"sync"
 	"unicode"
 )
 
@@ -25,17 +26,18 @@ type GenerateExcel struct {
 	sourcePath    string //源路径
 	genList       []IGen
 	genGlobalList []IGlobalGen
-	cfgDatas      map[string]*model.ConfigData
-	genCfg        *GenCfg
+	//cfgDatas      map[string]*model.ConfigData
+	cfgDatas sync.Map
+	genCfg   *GenCfg
 }
 
 func NewGenerateExcel(sourcePath, toPath string, opt ...GenOption) *GenerateExcel {
 	gen := &GenerateExcel{
 		toPath:        toPath,
 		sourcePath:    sourcePath,
-		genList:       make([]IGen, 0, 10),
-		genGlobalList: make([]IGlobalGen, 0, 10),
-		cfgDatas:      make(map[string]*model.ConfigData, 1),
+		genList:       make([]IGen, 0, 1),
+		genGlobalList: make([]IGlobalGen, 0, 1),
+		//cfgDatas:      make(map[string]*model.ConfigData, 1),
 	}
 	gen.genCfg = &GenCfg{}
 	for _, option := range opt {
@@ -62,33 +64,30 @@ func (g *GenerateExcel) ReadFile() error {
 	if g.toPath == "" {
 		return ErrorToPath
 	}
-
 	files, err := ioutil.ReadDir(g.sourcePath)
 	if err != nil {
 		return err
 	}
-	sheetNames := make([]string, 0)
+	var wg sync.WaitGroup
 	for _, file := range files {
 		if g.isFileContinue(file.Name()) {
 			continue
 		}
-
 		p1 := path.Join(g.sourcePath, file.Name())
 		f, err := xlsx.OpenFile(p1)
 		if err != nil {
 			return err
 		}
 		zaplog.SugaredLogger.Debugf("gen---file=%s", file.Name())
-		for _, sheet := range f.Sheets {
+		for _, s := range f.Sheets {
+			sheet := s
 			if g.isSheetContinue(sheet) { //跳过sheet
 				continue
 			}
-
 			if sheet.MaxRow < g.genCfg.SkipRowNumber+1 {
 				zaplog.SugaredLogger.Errorf("ReadFile sheet.MaxRow < %d sheet=%s", g.genCfg.SkipRowNumber+1, sheet.Name)
 				return ErrorMaxRow
 			}
-
 			zaplog.SugaredLogger.Debugf("gen---sheet%s", sheet.Name)
 			sheetName := sheet.Name
 			if strings.Contains(sheet.Name, "_s") { //去掉后缀
@@ -96,16 +95,25 @@ func (g *GenerateExcel) ReadFile() error {
 			} else if strings.Contains(sheet.Name, "_c") {
 				sheetName = strings.TrimRight(sheetName, "_c")
 			}
-			err2 := g.GenSheet(sheet, sheetName, Packaged)
-			if err2 != nil {
-				zaplog.SugaredLogger.Panicf("ReadFile sheet=%s gen err %v", sheetName, err2)
-				return err2
-			}
-			sheetNames = append(sheetNames, sheetName)
+			wg.Add(1)
+			go func() { //并行
+				defer wg.Done()
+				err2 := g.GenSheet(sheet, sheetName, Packaged)
+				if err2 != nil {
+					zaplog.SugaredLogger.Panicf("ReadFile sheet=%s gen err %v", sheetName, err2)
+					return
+				}
+			}()
 		}
 	}
+	wg.Wait()
+	var cfgDatas []*model.ConfigData
+	g.cfgDatas.Range(func(key, value any) bool {
+		cfgDatas = append(cfgDatas, value.(*model.ConfigData))
+		return true
+	})
 	for _, gen := range g.genGlobalList {
-		err2 := gen.Gen(Packaged, g.toPath, g.cfgDatas)
+		err2 := gen.Gen(Packaged, g.toPath, &cfgDatas)
 		if err2 != nil {
 			zaplog.SugaredLogger.Panicf("genGlobalList gen err %v", err2)
 		}
@@ -173,7 +181,7 @@ func (g *GenerateExcel) GenSheet(sheet *xlsx.Sheet, sheetName, pack string) erro
 	}
 
 	configData := model.NewConfigData(g.toPath, pack, sheetName, metaList, dataList)
-	g.cfgDatas[sheetName] = configData //存一下 后面使用
+	g.cfgDatas.Store(sheetName, configData)
 	for _, gen := range g.genList {
 		err := gen.Gen(configData)
 		if err != nil {

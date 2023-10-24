@@ -1,0 +1,243 @@
+// Package {{.Package}} generate. DO NOT EDIT.
+package {{.Package}}
+
+import (
+	"encoding/json"
+	"errors"
+	"sync"
+	"strconv"
+    "strings"
+)
+
+var (
+	LoadedCallBackWithName func(path string)
+	ErrNotExist            = errors.New("Not Found by your ID")
+
+{{- range .Fields }}
+	Name{{.Name}}Conf	= "{{.Name}}_conf.gen.json"
+	count{{.Name}}		= 0
+	lock{{.Name}}		sync.RWMutex
+	conf{{.Name}}		*{{.Name}}Conf
+	checker{{.Name}}	*{{.Name}}ConfChecker
+{{- end}}
+)
+
+func loadDataWithPath(buff []byte, msg interface{}) error {
+	err := json.Unmarshal(buff, msg)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func InitCheckerFunc(checkerFunc map[string]func(i interface{}, param string) bool) {
+	for k, f := range checkerFunc {
+		checkers[k] = f
+	}
+}
+
+func DefaultChecker() {
+	checkers["ArrayExist"] = ArrayExist
+	checkers["Scope"] = Scope
+	checkers["Exist"] = Exist
+	checkers["MapValExist"] = MapValExist
+	checkers["MapKeyExist"] = MapKeyExist
+}
+
+func InitWithLoader(f func(key string, f func(b []byte) error)) {
+	addLoaderFunc = f
+
+{{- range .Fields}}
+	addLoaderFunc(Name{{.Name}}Conf, func(buff []byte) error {
+		tmp := new({{.Name}}Conf)
+		err := loadDataWithPath(buff, tmp)
+		if err != nil {
+			return err
+		}
+		lock{{.Name}}.Lock()
+		conf{{.Name}} = tmp
+		count{{.Name}} = len(tmp.{{.Name}}s)
+		lock{{.Name}}.Unlock()
+		if LoadedCallBackWithName != nil {
+			LoadedCallBackWithName(Name{{.Name}}Conf)
+		}
+		return nil
+	})
+{{- end}}
+	initGetFunc()
+}
+
+func Checker() bool{
+    DefaultChecker()
+	ok := true
+	ret := true
+{{- range .Fields}}
+	ret = checker{{.Name}}.Check()
+	if !ret {
+		ok = false
+	}
+{{- end}}
+	return ok
+}
+
+func initGetFunc() {
+{{- range .Fields}}
+	getFunc["{{.Name}}"] = func(key interface{}) (interface{}, bool) {
+		var id {{.PriTyp}}
+		switch key.(type) {
+		case int:
+			k2, ok := key.(int)
+			if !ok {
+				return nil, false
+			}
+			id = {{.PriTyp}}(k2)
+		default:
+			k3, ok := key.({{.PriTyp}})
+			if !ok {
+				return nil, false
+			}
+			id = k3
+		}
+		c, h := Get{{.Name}}(id)
+		return c, h
+	}
+{{- end}}
+
+}
+
+
+func Get(confName string, key interface{}) (interface{}, bool) {
+	f, h := getFunc[confName]
+	if !h {
+		return nil, false
+	}
+	return f(key)
+}
+
+{{- range .Fields}}
+
+func Get{{.Name}}(key {{.PriTyp}}) (*{{.Name}}, bool) {
+	if item, ok := get{{.Name}}Map()[key]; ok {
+		return item, ok
+	}
+	return nil, false
+}
+
+func get{{.Name}}Map() map[{{.PriTyp}}]*{{.Name}} {
+	return Get{{.Name}}Conf().{{.Name}}s
+}
+
+func Get{{.Name}}Conf() (ret *{{.Name}}Conf) {
+	lock{{.Name}}.RLock()
+	ret = conf{{.Name}}
+	lock{{.Name}}.RUnlock()
+	return
+}
+
+func Count{{.Name}}Map() (c int) {
+	lock{{.Name}}.RLock()
+	c = count{{.Name}}
+	lock{{.Name}}.RUnlock()
+	return
+}
+{{- end}}
+
+// ArrayExist 数组里的数据是否存在于另一配置中 例子:ArrayExist?OutputInfoData
+func ArrayExist(i interface{}, param string) bool {
+	arr, ok := i.([]int32)
+	if !ok {
+		return false
+	}
+	if param == "" {
+		return false
+	}
+	for _, id := range arr {
+		_, ok2 := Get(param, id)
+		if !ok2 {
+			return false
+		}
+	}
+	return true
+}
+
+// Scope 区间值判断 例子:Scope?1,2
+func Scope(i interface{}, param string) bool {
+	d, ok := i.(int32)
+	if !ok {
+		return false
+	}
+	if param == "" {
+		return false
+	}
+	ss := strings.Split(param, ",")
+	if len(ss) != 2 {
+		return false
+	}
+	min, err := strconv.ParseInt(ss[0], 10, 32)
+	if err != nil {
+		return false
+	}
+	max, err := strconv.ParseInt(ss[1], 10, 32)
+	if err != nil {
+		return false
+	}
+	if d < int32(min) {
+		return false
+	}
+	if d > int32(max) {
+		return false
+	}
+	return true
+}
+
+// Exist 例子:Exist?ItemData
+func Exist(i interface{}, param string) bool {
+	id, ok := i.(int32)
+	if !ok {
+		return false
+	}
+	if param == "" {
+		return false
+	}
+	_, ok2 := Get(param, id)
+	if !ok2 {
+		return false
+	}
+	return true
+}
+
+// MapValExist map中的val 是否存在于另一配置中
+func MapValExist(i interface{}, param string) bool {
+	m, ok := i.(map[int32]int32)
+	if !ok {
+		return false
+	}
+	if param == "" {
+		return false
+	}
+	for _, val := range m {
+		_, ok2 := Get(param, val)
+		if !ok2 {
+			return false
+		}
+	}
+	return true
+}
+
+// MapKeyExist map中的key 是否存在于另一配置中
+func MapKeyExist(i interface{}, param string) bool {
+	m, ok := i.(map[int32]int32)
+	if !ok {
+		return false
+	}
+	if param == "" {
+		return false
+	}
+	for k, _ := range m {
+		_, ok2 := Get(param, k)
+		if !ok2 {
+			return false
+		}
+	}
+	return true
+}

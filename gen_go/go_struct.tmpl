@@ -1,0 +1,9 @@
+// Package {{.Package}} generate. DO NOT EDIT.
+package {{.Package}}
+
+type {{.Name}} struct {
+{{- range .Fields}}
+	// {{.Annotation}}
+	{{.Name}} {{.Kind}} {{.JsonStr}}
+{{- end}}
+}

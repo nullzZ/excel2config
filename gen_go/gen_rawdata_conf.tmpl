@@ -1,0 +1,14 @@
+// Package {{.Package}} generate. DO NOT EDIT.
+package {{.Package}}
+
+
+type {{.Name}}Conf struct {
+	{{.Name}}s         map[{{.PriType}}]*{{.Name}}
+}
+
+func (m *{{.Name}}Conf) Get{{.Name}}s() map[{{.PriType}}]*{{.Name}} {
+	if m != nil {
+		return m.{{.Name}}s
+	}
+	return nil
+}

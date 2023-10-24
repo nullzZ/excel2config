@@ -1,6 +1,7 @@
 package gen_go
 
 import (
+	_ "embed"
 	"github.com/nullzZ/excel2config/model"
 	"github.com/nullzZ/excel2config/pkg/file"
 	"os"
@@ -8,11 +9,14 @@ import (
 	"text/template"
 )
 
+//go:embed gen_load.tmpl
+var genLoadTmpl string
+
 type GenGlobalLoad struct{}
 
-func (GenGlobalLoad) Gen(packaged, toPath string, rawdataConfs map[string]*model.ConfigData) error {
+func (GenGlobalLoad) Gen(packaged, toPath string, configDatas *[]*model.ConfigData) error {
 	gen := NewGenLoad(packaged)
-	for _, v := range rawdataConfs {
+	for _, v := range *configDatas {
 		gen.Fields = append(gen.Fields, &GenLoadField{
 			Name:   v.StructName,
 			PriTyp: v.PriType,

@@ -100,7 +100,7 @@ mapInt32Float64 = "map<int32,double>"
     ```
     zap_log.Init(false, zap.DebugLevel)
     config.InitWithLoader(conf_loader.AddLoader)
-    conf_loader.MustInitLocal("/Users/malei/works/null-kit/excel2conf/gen/rawdata", true, zap_log.Logger)
+    conf_loader.MustInitLocal("/Users/nullzZ/works/null-kit/excel2conf/gen/rawdata", true, zap_log.Logger)
    ```
 * 获取数据 c, ok := config.GetTest("1")
 * 另一种获取数据的方式 c,ok:=config.Get("SheetName",id),
@@ -137,8 +137,11 @@ mapInt32Float64 = "map<int32,double>"
       }
       return true
   }
+  
+  config.InitWithLoader(conf_loader.AddLoader)
   config.InitCheckerFunc(m)//注册自定义注解函数
   conf_loader.AddChecker(config.Checker)//加载检测方法
+  conf_loader.MustInitLocal("/Users/nullzZ/works/null-kit/excel2conf/gen/rawdata", true, zap_log.Logger)
   ```
 
 ### build

@@ -1,0 +1,7 @@
+// Package {{.Package}} generate. DO NOT EDIT.
+package {{.Package}}
+
+
+var addLoaderFunc = func(key string, f func(b []byte) error) { panic("please init addLoaderFunc first.") }
+var checkers = make(map[string]func(i interface{}, param string) bool)
+var getFunc = make(map[string]func(b interface{}) (interface{}, bool), 0)

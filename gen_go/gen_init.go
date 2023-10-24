@@ -1,6 +1,7 @@
 package gen_go
 
 import (
+	_ "embed"
 	"github.com/nullzZ/excel2config/model"
 	"github.com/nullzZ/excel2config/pkg/file"
 	"os"
@@ -8,9 +9,12 @@ import (
 	"text/template"
 )
 
+//go:embed gen_init.tmpl
+var genInitTmpl string
+
 type GenGlobalInit struct{}
 
-func (GenGlobalInit) Gen(packaged, toPath string, datas map[string]*model.ConfigData) error {
+func (GenGlobalInit) Gen(packaged, toPath string, configDatas *[]*model.ConfigData) error {
 	gen := NewGenInit(packaged)
 
 	dirPath := filepath.Join(toPath, "config")

@@ -108,8 +108,11 @@ func AddChecker(ff func() bool) {
 	checker = ff
 }
 
-func MustInitLocal(path string, liveLoading bool, zapLogger *zap.SugaredLogger) {
-	logger = zapLogger
+func MustInitLocal(path string, liveLoading bool, zapLogger *zap.Logger) {
+	if zapLogger == nil {
+		zapLogger, _ = zap.NewDevelopment()
+	}
+	logger = zapLogger.Sugar()
 	InitWithLoader(path, NewLocalLoader(), true, liveLoading)
 	if checker != nil {
 		ok := checker()

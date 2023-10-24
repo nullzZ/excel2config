@@ -14,7 +14,7 @@ type GenGlobalLoader struct{}
 //go:embed loader.tmpl
 var loaderTmpl string
 
-func (GenGlobalLoader) Gen(packaged, toPath string, rawdataConfs map[string]*model.ConfigData) error {
+func (GenGlobalLoader) Gen(packaged, toPath string, configDatas *[]*model.ConfigData) error {
 	gen := NewGenLoader(packaged)
 	dirPath := filepath.Join(toPath, "conf_loader")
 	if !file.Exists(dirPath) {

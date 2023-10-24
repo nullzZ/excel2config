@@ -5,8 +5,6 @@ import (
 	"github.com/nullzZ/excel2config/field"
 	"github.com/nullzZ/excel2config/gen/conf_loader"
 	"github.com/nullzZ/excel2config/gen/config"
-	"github.com/nullzZ/excel2config/gen_go"
-	"github.com/nullzZ/excel2config/pkg/checker"
 	"github.com/nullzZ/excel2config/pkg/zaplog"
 	"go.uber.org/zap"
 	"log"
@@ -14,23 +12,10 @@ import (
 )
 
 func TestGenGo(t *testing.T) {
-	sourcePath := "/Users/malei/works/excel2config/data"
-	toPath := "/Users/malei/works/excel2config/gen"
-	zaplog.Init(zap.DebugLevel)
+	sourcePath := "/Users/nullzZ/works/excel2config/data"
+	toPath := "/Users/nullzZ/works/excel2config/gen"
 	gen := NewGenerateExcel(sourcePath, toPath, WithSkipRow(5), WithSkipCol(1))
-	gen.AddGen(&gen_go.GenConfigStruct{})
-	gen.AddGen(&gen_go.GenRawdataConf{})
-	gen.AddGen(&gen_go.GenChecker{})
-
-	gen.AddGlobalGen(&gen_go.GenGlobalLoad{})
-	gen.AddGlobalGen(&gen_go.GenGlobalInit{})
-	gen.AddGlobalGen(&gen_go.GenGlobalLoader{})
-	gen.AddGlobalGen(&gen_go.GenGlobalErr{})
-
-	err := gen.ReadFile()
-	if err != nil {
-		t.Errorf("err=%q", err)
-	}
+	Gen(gen)
 }
 
 func TestIsRepeated(t *testing.T) {
@@ -67,10 +52,9 @@ func TestParseRepeated2Json(t *testing.T) {
 func TestLoader(t *testing.T) {
 	zaplog.Init(zap.DebugLevel)
 	config.InitWithLoader(conf_loader.AddLoader)
-	conf_loader.MustInitLocal("/Users/malei/works/excel2config/gen/rawdata", true, zaplog.SugaredLogger)
-
 	m := make(map[string]func(i interface{}, param string) bool)
-	m["ArrayExist"] = checker.ArrayExist
+	//m["ArrayExist"] = checker.ArrayExist
 	config.InitCheckerFunc(m)              //注册自定义注解函数
 	conf_loader.AddChecker(config.Checker) //加载检测方法
+	conf_loader.MustInitLocal("/Users/nullzZ/works/excel2config/gen/rawdata", true, zaplog.Logger)
 }

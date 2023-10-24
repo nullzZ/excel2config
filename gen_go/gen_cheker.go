@@ -1,6 +1,7 @@
 package gen_go
 
 import (
+	_ "embed"
 	"fmt"
 	"github.com/nullzZ/excel2config/model"
 	"github.com/nullzZ/excel2config/pkg/file"
@@ -10,6 +11,9 @@ import (
 	"strings"
 	"text/template"
 )
+
+//go:embed checker.tmpl
+var genCheckerTmpl string
 
 type GenChecker struct{}
 

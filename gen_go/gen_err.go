@@ -14,7 +14,7 @@ type GenGlobalErr struct{}
 //go:embed errArray.tmpl
 var errTmpl string
 
-func (GenGlobalErr) Gen(packaged, toPath string, rawdataConfs map[string]*model.ConfigData) error {
+func (GenGlobalErr) Gen(packaged, toPath string, configDatas *[]*model.ConfigData) error {
 	gen := NewGenLoader(packaged)
 	dirPath := filepath.Join(toPath, "conf_loader")
 	if !file.Exists(dirPath) {
