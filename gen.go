@@ -13,7 +13,7 @@ func Gen(gen *GenerateExcel) {
 	gen.AddGen(&gen_go.GenChecker{})
 	gen.AddGlobalGen(&gen_go.GenGlobalLoad{})
 	gen.AddGlobalGen(&gen_go.GenGlobalInit{})
-	gen.AddGlobalGen(&gen_go.GenGlobalLoader{})
+	//gen.AddGlobalGen(&gen_go.GenGlobalLoader{})
 	gen.AddGlobalGen(&gen_go.GenGlobalErr{})
 	err := gen.ReadFile()
 	if err != nil {

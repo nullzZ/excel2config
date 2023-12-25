@@ -3,8 +3,8 @@ package excel2conf
 import (
 	"encoding/json"
 	"github.com/nullzZ/excel2config/field"
-	"github.com/nullzZ/excel2config/gen/conf_loader"
 	"github.com/nullzZ/excel2config/gen/config"
+	"github.com/nullzZ/excel2config/loader"
 	"github.com/nullzZ/excel2config/pkg/zaplog"
 	"go.uber.org/zap"
 	"log"
@@ -12,8 +12,8 @@ import (
 )
 
 func TestGenGo(t *testing.T) {
-	sourcePath := "/Users/nullzZ/works/excel2config/data"
-	toPath := "/Users/nullzZ/works/excel2config/gen"
+	sourcePath := "/Users/malei/works/excel2config/data"
+	toPath := "/Users/malei/works/excel2config/gen"
 	gen := NewGenerateExcel(sourcePath, toPath, WithSkipRow(5), WithSkipCol(1))
 	Gen(gen)
 }
@@ -51,10 +51,11 @@ func TestParseRepeated2Json(t *testing.T) {
 
 func TestLoader(t *testing.T) {
 	zaplog.Init(zap.DebugLevel)
-	config.InitWithLoader(conf_loader.AddLoader)
+	config.InitWithLoader(loader.AddLoader)
 	m := make(map[string]func(i interface{}, param string) bool)
 	//m["ArrayExist"] = checker.ArrayExist
-	config.InitCheckerFunc(m)              //注册自定义注解函数
-	conf_loader.AddChecker(config.Checker) //加载检测方法
-	conf_loader.MustInitLocal("/Users/nullzZ/works/excel2config/gen/rawdata", true, zaplog.Logger)
+	config.InitCheckerFunc(m)         //注册自定义注解函数
+	loader.AddChecker(config.Checker) //加载检测方法
+	loader.SetLogger(zaplog.Logger)   //设置log，可以不设置
+	loader.MustInitLocal("/Users/malei/works/excel2config/gen/rawdata", true)
 }
